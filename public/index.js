@@ -18,10 +18,6 @@ request.onupgradeneeded = ({ target }) => {
   });
 };
 
-const addToDB = () => {
-  const transaction = db.transaction(["transactions"]);
-};
-
 fetch("/api/transaction")
   .then((response) => {
     return response.json();
@@ -166,12 +162,37 @@ function sendTransaction(isAdding) {
 }
 
 function saveRecord(item) {
+  const request = window.indexedDB.open("storeTransactions", 1);
+
+  request.onsuccess = (event) => {
+    console.log(request.result.name);
+  };
+
+  request.onupgradeneeded = ({ target }) => {
+    const db = target.result;
+    const objectStore = db.createObjectStore("transactions", {
+      keyPath: "transactionID",
+    });
+  };
   const transaction = db.transaction(["transaction"], "readwrite");
   const transactionStore = transaction.objectStore("transaction");
   transactionStore.add(item);
 }
 
 function checkStatus() {
+  const request = window.indexedDB.open("storeTransactions", 1);
+
+  request.onsuccess = (event) => {
+    console.log(request.result.name);
+  };
+
+  request.onupgradeneeded = ({ target }) => {
+    const db = target.result;
+    const objectStore = db.createObjectStore("transactions", {
+      keyPath: "transactionID",
+    });
+  };
+
   //if window is online retrieve all items from the store and bulk post
   if (window.online) {
     const transaction = db.transaction(["transaction"], "readwrite");
