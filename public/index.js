@@ -1,7 +1,10 @@
 let transactions = [];
 let myChart;
 
+checkStatus();
+
 //add indexDB Storage
+let db;
 const request = window.indexedDB.open("storeTransactions", 1);
 
 request.onsuccess = (event) => {
@@ -10,8 +13,13 @@ request.onsuccess = (event) => {
 
 request.onupgradeneeded = ({ target }) => {
   const db = target.result;
-  const objectStore = db.createObjectStore("transactions");
-  objectStore.createIndex("offlineStatus", "offline");
+  const objectStore = db.createObjectStore("transactions", {
+    keyPath: "transactionID",
+  });
+};
+
+const addToDB = () => {
+  const transaction = db.transaction(["transactions"]);
 };
 
 fetch("/api/transaction")
@@ -157,6 +165,49 @@ function sendTransaction(isAdding) {
     });
 }
 
+function saveRecord(item) {
+  const transaction = db.transaction(["transaction"], "readwrite");
+  const transactionStore = transaction.objectStore("transaction");
+  transactionStore.add(item);
+}
+
+function checkStatus() {
+  //if window is online retrieve all items from the store and bulk post
+  if (window.online) {
+    const transaction = db.transaction(["transaction"], "readwrite");
+    const transactionStore = transaction.objectStore("transaction");
+    const toPost = transactionStore.getAll();
+
+    toPost.onsuccess = () => {
+      fetch("/api/transaction/bulk", {
+        method: "POST",
+        body: JSON.stringify(transaction),
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+        },
+      })
+        .then((response) => {
+          return response.json();
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+
+      //delete items once posted
+      const getCursorRequest = transactionStore.openCursor();
+      getCursorRequest.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const toDelete = cursor.value;
+          cursor.delete(toDelete);
+          cursor.continue();
+        }
+      };
+    };
+  }
+}
+
 document.querySelector("#add-btn").onclick = function () {
   sendTransaction(true);
 };
@@ -164,3 +215,5 @@ document.querySelector("#add-btn").onclick = function () {
 document.querySelector("#sub-btn").onclick = function () {
   sendTransaction(false);
 };
+
+window.addEventListener("online", checkStatus);
